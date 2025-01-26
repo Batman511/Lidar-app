@@ -283,9 +283,9 @@ class App(QWidget):
         self.input_id.setPlaceholderText("Введите ID эксперимента")
         self.layout.addWidget(self.input_id)
 
-        self.input_description = QLineEdit()
-        self.input_description.setPlaceholderText("Введите описание помещения")
-        self.layout.addWidget(self.input_description)
+        self.input_room_description = QLineEdit()
+        self.input_room_description.setPlaceholderText("Введите описание помещения")
+        self.layout.addWidget(self.input_room_description)
 
         self.input_address = QLineEdit()
         self.input_address.setPlaceholderText("Введите адрес")
@@ -293,13 +293,15 @@ class App(QWidget):
 
         # Кнопка поиска
         self.find_button = QPushButton("Найти эксперименты")
+        self.find_button.setFixedHeight(40)
+        self.find_button.setStyleSheet("font-weight: bold;")
         self.find_button.clicked.connect(self.find_experiments)
         self.layout.addWidget(self.find_button)
 
         # Таблица для отображения результатов поиска
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(4)  # Колонки: ID, Описание, Адрес, Дата
-        self.results_table.setHorizontalHeaderLabels(["ID", "Описание", "Адрес", "Дата"])
+        self.results_table.setHorizontalHeaderLabels(["ID", "Дата", "Описание комнаты", "Адрес", "Описание объекта"])
         self.layout.addWidget(self.results_table)
 
         # Поле для ввода ID эксперимента
@@ -311,6 +313,8 @@ class App(QWidget):
 
         # Кнопка для получения результатов
         self.get_results_button = QPushButton("Получить результаты эксперимента")
+        self.get_results_button.setFixedHeight(40)
+        self.get_results_button.setStyleSheet("font-weight: bold;")
         self.get_results_button.clicked.connect(self.download_experiment_results)
         self.layout.addWidget(self.get_results_button)
 
