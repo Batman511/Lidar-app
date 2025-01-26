@@ -1,7 +1,25 @@
 import sys
 import psycopg2
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, QFileDialog, QMessageBox, QTableWidgetItem
+from PyQt6.QtCore import QThread, pyqtSignal
 
+class DBConnectionThread(QThread):
+    """Поток для проверки подключения к базе данных."""
+    connection_status = pyqtSignal(str)
+
+    def __init__(self, db_params):
+        super().__init__()
+        self.db_params = db_params
+
+    def run(self):
+        try:
+            # Попытка подключения к базе данных
+            conn = psycopg2.connect(**self.db_params)
+            self.connection_status.emit("Подключение к базе данных успешно выполнено.")
+            conn.close()
+        except Exception as e:
+            error_message = f"Ошибка подключения: {str(e)}"
+            self.connection_status.emit(error_message)
 
 class App(QWidget):
     def __init__(self):
@@ -25,6 +43,36 @@ class App(QWidget):
     def connect_ui(self):
         """Показывает UI для подключения к базе данных."""
         self.layout.addWidget(self.connect_button)
+
+    def connect_to_db(self):
+        """Попытка подключения к базе данных."""
+        db_params = {
+            'dbname': 'lidar',
+            'user': 'postgres',
+            'password': 'student 11',
+            'host': 'localhost',
+            'port': '5432'
+        }
+
+        # Запускаем поток для проверки подключения
+        self.db_thread = DBConnectionThread(db_params)
+        self.db_thread.connection_status.connect(self.update_connection_status)
+        self.db_thread.start()
+
+    def update_connection_status(self, status_message):
+        """Обновляет статус подключения и UI в зависимости от результата."""
+        if "успешно" in status_message:
+            QMessageBox.information(self, 'Статус подключения', status_message)
+            self.conn = True  # Устанавливаем флаг успешного подключения
+            self.showMainWindow()  # Переходим к основному окну
+        else:
+            QMessageBox.warning(self, 'Статус подключения', status_message)
+
+    def showMainWindow(self):
+        """Переход к основному окну приложения."""
+        if self.conn:
+            self.connected_ui()  # Показываем UI после подключения
+
 
     def connected_ui(self):
         """Показывает UI после успешного подключения к базе данных."""
@@ -77,28 +125,8 @@ class App(QWidget):
         self.add_button.clicked.connect(self.addMeasurementsToStorage)
         self.layout.addWidget(self.add_button)
 
-    def connect_to_db(self):
-        """Попытка подключения к базе данных."""
-        try:
-            self.conn = psycopg2.connect(
-                dbname='lidar',        # Имя базы данных
-                user='postgres',       # Имя пользователя
-                password='student',    # Пароль
-                host='localhost',      # Хост
-                port='5432',           # Порт
-            )
-            # Уведомление об успешном подключении
-            QMessageBox.information(self, 'Статус подключения', 'Подключение к базе данных успешно!')
-            self.showMainWindow()  # Переходим к основному окну
-        except psycopg2.OperationalError as e:
-            # Обработка ошибки подключения
-            QMessageBox.warning(self, 'Ошибка подключения', f'Не удалось подключиться к базе данных: {str(e)}')
-            self.conn = None  # Если не удалось подключиться, оставляем переменную соединения в None
 
-    def showMainWindow(self):
-        """Переход к основному окну приложения."""
-        if self.conn:
-            self.connected_ui()  # Показываем UI после подключения
+
 
     def onSelectFileClicked(self):
         filePath, _ = QFileDialog.getOpenFileName(self, 'Выберите файл', '', 'Текстовые файлы (*.txt);;Все файлы (*)')
