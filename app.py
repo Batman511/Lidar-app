@@ -1,23 +1,36 @@
 import sys
 import psycopg2
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, QFileDialog, QMessageBox, QDialog, QTableWidgetItem
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, QFileDialog, QMessageBox, QTableWidgetItem
 
-class LoadResultsDialog(QDialog):
-    def __init__(self, db_connection=None):
+class App(QWidget):
+    def __init__(self):
         super().__init__()
-        self.setWindowTitle('LIDAR Measurements')
-        self.layout = QVBoxLayout()
-        self.resize(800, 600)
+        self.setWindowTitle("Приложение с подключением к БД")
+        self.setGeometry(100, 100, 800, 600)
 
-        self.conn = db_connection
+        self.layout = QVBoxLayout(self)
 
-        if not self.conn:
-            self.showConnectionError()
-            return
+        # Кнопка для подключения
+        self.connect_button = QPushButton('Подключиться к БД', self)
+        self.connect_button.clicked.connect(self.connect_to_db)
+        self.layout.addWidget(self.connect_button)
 
-        self.initUI()
+        # Изначально соединение None
+        self.conn = None
 
-    def initUI(self):
+        # Изначально показываем только кнопку подключения
+        self.connect_ui()
+
+    def connect_ui(self):
+        """Показывает UI для подключения к базе данных."""
+        self.layout.addWidget(self.connect_button)
+
+    def connected_ui(self):
+        """Показывает UI после успешного подключения к базе данных."""
+        # Удаляем кнопку подключения
+        self.layout.removeWidget(self.connect_button)
+        self.connect_button.deleteLater()
+
         # Поля для ввода пользовательских данных
         self.ch_dt_label = QLabel('Дата и время (YYYY-MM-DD HH:MM:SS):')
         self.ch_dt_edit = QLineEdit()
@@ -63,10 +76,26 @@ class LoadResultsDialog(QDialog):
         self.add_button.clicked.connect(self.addMeasurementsToStorage)
         self.layout.addWidget(self.add_button)
 
-        self.setLayout(self.layout)
+    def connect_to_db(self):
+        """Попытка подключения к базе данных."""
+        try:
+            self.conn = psycopg2.connect(
+                dbname='lidar',        # Имя базы данных
+                user='postgres',       # Имя пользователя
+                password='student',    # Пароль
+                host='localhost',      # Хост
+                port='5432',           # Порт
+            )
+            self.showMainWindow()  # Переходим к основному окну
+        except psycopg2.OperationalError as e:
+            # Обработка ошибки подключения
+            QMessageBox.warning(self, 'Ошибка подключения', f'Не удалось подключиться к базе данных: {str(e)}')
+            self.conn = None  # Если не удалось подключиться, оставляем переменную соединения в None
 
-    def showConnectionError(self):
-        QMessageBox.warning(self, 'Ошибка подключения', 'Не удалось подключиться к базе данных. Проверьте логин, пароль или наличие базы данных.')
+    def showMainWindow(self):
+        """Переход к основному окну приложения."""
+        if self.conn:
+            self.connected_ui()  # Показываем UI после подключения
 
     def onSelectFileClicked(self):
         filePath, _ = QFileDialog.getOpenFileName(self, 'Выберите файл', '', 'Текстовые файлы (*.txt);;Все файлы (*)')
@@ -98,50 +127,6 @@ class LoadResultsDialog(QDialog):
             QMessageBox.information(self, 'Успех', 'Измерения успешно добавлены в хранилище.')
         else:
             QMessageBox.warning(self, 'Ошибка', 'Не удалось подключиться к базе данных.')
-
-class App(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Приложение с подключением к БД")
-        self.setGeometry(100, 100, 400, 300)
-
-        self.layout = QVBoxLayout(self)
-
-        # Кнопка для подключения
-        self.connect_button = QPushButton('Подключиться к БД', self)
-        self.connect_button.clicked.connect(self.connect_to_db)
-        self.layout.addWidget(self.connect_button)
-
-        # Изначально соединение None
-        self.conn = None
-
-        # Инициализация основного окна
-        self.dialog = None
-
-    def connect_to_db(self):
-        """Попытка подключения к базе данных."""
-        try:
-            self.conn = psycopg2.connect(
-                dbname='lidar',        # Имя базы данных
-                user='postgres',       # Имя пользователя
-                password='stud',    # Пароль
-                host='localhost',      # Хост
-                port='5432',           # Порт
-            )
-            self.showMainWindow()  # Переходим к основному окну
-        except psycopg2.OperationalError as e:
-            # Обработка ошибки подключения
-            QMessageBox.warning(self, 'Ошибка подключения', f'Не удалось подключиться к базе данных: {str(e)}')
-            self.conn = None  # Если не удалось подключиться, оставляем переменную соединения в None
-
-    def showMainWindow(self):
-        """Переход к основному окну приложения."""
-        if self.dialog:
-            self.dialog.close()  # Закрываем старое окно, если оно было открыто
-
-        # Открываем новый диалог
-        self.dialog = LoadResultsDialog(self.conn)
-        self.dialog.show()
 
     def closeEvent(self, event):
         """Закрытие приложения и проверка соединения с БД перед выходом."""
