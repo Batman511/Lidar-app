@@ -2,16 +2,17 @@ import sys
 import psycopg2
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, QFileDialog, QMessageBox, QTableWidgetItem
 
+
 class App(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Приложение с подключением к БД")
+        self.setWindowTitle("LIDAR Measurements")
         self.setGeometry(100, 100, 800, 600)
 
         self.layout = QVBoxLayout(self)
 
         # Кнопка для подключения
-        self.connect_button = QPushButton('Подключиться к БД', self)
+        self.connect_button = QPushButton('Подключиться к локальной БД', self)
         self.connect_button.clicked.connect(self.connect_to_db)
         self.layout.addWidget(self.connect_button)
 
@@ -86,6 +87,8 @@ class App(QWidget):
                 host='localhost',      # Хост
                 port='5432',           # Порт
             )
+            # Уведомление об успешном подключении
+            QMessageBox.information(self, 'Статус подключения', 'Подключение к базе данных успешно!')
             self.showMainWindow()  # Переходим к основному окну
         except psycopg2.OperationalError as e:
             # Обработка ошибки подключения
