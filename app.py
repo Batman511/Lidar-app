@@ -27,7 +27,7 @@ class App(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LIDAR Measurements")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(400, 200, 800, 600)
 
         self.layout = QVBoxLayout(self)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -269,15 +269,6 @@ class App(QWidget):
         self.search_label = QLabel("Выберите параметры для поиска:")
         self.layout.addWidget(self.search_label)
 
-        self.id_checkbox = QCheckBox("ID эксперимента")
-        self.layout.addWidget(self.id_checkbox)
-
-        self.description_checkbox = QCheckBox("Описание помещения")
-        self.layout.addWidget(self.description_checkbox)
-
-        self.address_checkbox = QCheckBox("Адрес")
-        self.layout.addWidget(self.address_checkbox)
-
         # Поля для ввода значений
         self.input_id = QLineEdit()
         self.input_id.setPlaceholderText("Введите ID эксперимента")
@@ -300,9 +291,16 @@ class App(QWidget):
 
         # Таблица для отображения результатов поиска
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(4)  # Колонки: ID, Описание, Адрес, Дата
-        self.results_table.setHorizontalHeaderLabels(["ID", "Дата", "Описание комнаты", "Адрес", "Описание объекта"])
+        self.results_table.setColumnCount(5)
+        self.results_table.setHorizontalHeaderLabels(["ID", "Дата", "Описание помещения", "Адрес", "Описание объекта"])
         self.layout.addWidget(self.results_table)
+
+        # Устанавливаем фиксированную ширину для каждого столбца
+        self.results_table.setColumnWidth(0, 30)  # Ширина для столбца "ID"
+        self.results_table.setColumnWidth(1, 140)  # Ширина для столбца "Дата"
+        self.results_table.setColumnWidth(2, 180)  # Ширина для столбца "Описание помещения"
+        self.results_table.setColumnWidth(3, 200)  # Ширина для столбца "Адрес"
+        self.results_table.setColumnWidth(4, 200)  # Ширина для столбца "Описание объекта"
 
         # Поле для ввода ID эксперимента
         self.experiment_id_label = QLabel("Введите ID эксперимента:")
@@ -320,20 +318,26 @@ class App(QWidget):
 
     def find_experiments(self):
         """Ищет эксперименты по выбранным параметрам."""
-        query = "SELECT id, description, address, date FROM experiment WHERE 1=1"
+        query = "SELECT id, data, room_description, address , object_description FROM experiment WHERE 1=1"
         params = []
 
-        if self.id_checkbox.isChecked() and self.input_id.text().strip():
+        # Получаем значения из полей ввода
+        id_value = self.input_id.text().strip()
+        room_desc_value = self.input_room_description.text().strip()
+        address_value = self.input_address.text().strip()
+
+
+        if id_value:
             query += " AND id = %s"
-            params.append(self.input_id.text().strip())
+            params.append(id_value)
 
-        if self.description_checkbox.isChecked() and self.input_description.text().strip():
-            query += " AND description ILIKE %s"
-            params.append(f"%{self.input_description.text().strip()}%")
+        if room_desc_value:
+            query += " AND room_description ILIKE %s"
+            params.append(f'%{room_desc_value}%')
 
-        if self.address_checkbox.isChecked() and self.input_address.text().strip():
+        if address_value:
             query += " AND address ILIKE %s"
-            params.append(f"%{self.input_address.text().strip()}%")
+            params.append(f'%{address_value}%')
 
         try:
             cursor = self.conn.cursor()
@@ -345,7 +349,6 @@ class App(QWidget):
             for row_idx, row_data in enumerate(results):
                 for col_idx, col_data in enumerate(row_data):
                     self.results_table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
-
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось выполнить запрос: {str(e)}")
 
