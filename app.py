@@ -149,6 +149,12 @@ class App(QWidget):
         self.layout.addWidget(self.coordinates_label)
         self.layout.addWidget(self.coordinates_edit)
 
+        self.object_label = QLabel('Описание объекта:')
+        self.object_edit = QLineEdit()
+        self.layout.addWidget(self.object_label)
+        self.layout.addWidget(self.object_edit)
+
+
         self.coordinates_label = QLabel('Полярные координаты объекта из файла: *')
         self.layout.addWidget(self.coordinates_label)
 
@@ -158,18 +164,18 @@ class App(QWidget):
         self.coordinates_table.setHorizontalHeaderLabels(["Fi", "R", "Teta"])
         self.layout.addWidget(self.coordinates_table)
 
-        self.object_label = QLabel('Описание объекта:')
-        self.object_edit = QLineEdit()
-        self.layout.addWidget(self.object_label)
-        self.layout.addWidget(self.object_edit)
 
         # Кнопка для выбора файла
         self.file_button = QPushButton('Выбрать файл')
         self.file_button.clicked.connect(self.onSelectFileClicked)
+        self.file_button.setFixedHeight(40)
+        self.file_button.setStyleSheet("font-weight: bold;")
         self.layout.addWidget(self.file_button)
 
         # Кнопка для добавления результатов измерений в сетевое хранилище
-        self.add_button = QPushButton('Добавить измерения в локальное хранилище')
+        self.add_button = QPushButton('Добавить измерения в хранилище')
+        self.add_button.setFixedHeight(40)
+        self.add_button.setStyleSheet("font-weight: bold;")
         self.add_button.clicked.connect(self.addMeasurementsToLocalStorage)
         self.layout.addWidget(self.add_button)
 
@@ -216,10 +222,11 @@ class App(QWidget):
                 QMessageBox.warning(self, 'Ошибка', 'Заполните все обязательные поля и загрузите файл.')
                 return
 
+
             # Вставка данных в таблицу experiment
             cursor.execute("""
                         INSERT INTO experiment 
-                        (ch_dt, room_description, address, coordinates, object_description) 
+                        (data, room_description, address, coordinates, object_description) 
                         VALUES (%s, %s, %s, %s, %s)
                         RETURNING id
                         """,
@@ -231,23 +238,18 @@ class App(QWidget):
             # Вставка данных из таблицы координат в таблицу measurement с experiment_id
             for row in range(self.coordinates_table.rowCount()):
                 fi = self.coordinates_table.item(row, 0).text()
-                teta = self.coordinates_table.item(row, 2).text()
                 R = self.coordinates_table.item(row, 1).text()
-                try:
-                    cursor.execute("""
-                                INSERT INTO measurements 
-                                (id, fi, teta, R) 
-                                VALUES (%s, %s, %s, %s)
-                                """,
-                           (experiment_id, fi, teta, R))
-                    self.conn.commit()
-                except Exception as e:
-                    self.conn.rollback()
-                    QMessageBox.critical(self, 'Ошибка', f'Ошибка при добавлении данных: {str(e)}')
-                    cursor.close()
-                    return
+                teta = self.coordinates_table.item(row, 2).text()
 
-            QMessageBox.information(self, 'Успех', 'Данные успешно добавлены в базу данных.')
+                cursor.execute("""
+                            INSERT INTO measurements 
+                            (id, fi, teta, R) 
+                            VALUES (%s, %s, %s, %s)
+                            """,
+                       (experiment_id, fi, teta, R))
+                self.conn.commit()
+
+            QMessageBox.information(self, 'Успех', 'Данные успешно добавлены в локальную базу данных.')
         except Exception as e:
             self.conn.rollback()
             QMessageBox.critical(self, 'Ошибка', f'Ошибка при добавлении данных: {str(e)}')
