@@ -1,8 +1,9 @@
 import sys
 import psycopg2
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, QFileDialog, QMessageBox, QTableWidgetItem
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, QFileDialog, QMessageBox, QTableWidgetItem, QCheckBox
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
-from psycopg2 import sql
+from PyQt6.QtGui import QFont
+
 
 class DBConnectionThread(QThread):
     """Поток для проверки подключения к базе данных."""
@@ -114,17 +115,11 @@ class App(QWidget):
 
     def connected_ui_sending(self):
         """Показывает UI после успешного подключения к базе данных."""
-        # Удаляем кнопки подключения
-        self.layout.removeWidget(self.connect_button_local)
-        self.connect_button_local.deleteLater()
-        self.layout.removeWidget(self.connect_button_global)
-        self.connect_button_global.deleteLater()
-        self.layout.removeWidget(self.connect_button_download)
-        self.connect_button_download.deleteLater()
-        self.layout.removeWidget(self.info_label_1)
-        self.info_label_1.deleteLater()
-        self.layout.removeWidget(self.info_label_2)
-        self.info_label_2.deleteLater()
+        # Очистка текущего интерфейса
+        for i in reversed(range(self.layout.count())):
+            widget = self.layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
 
 
         # Добавляем для хранения координат из файла.
@@ -181,7 +176,6 @@ class App(QWidget):
         self.add_button.clicked.connect(self.addMeasurementsToLocalStorage)
         self.layout.addWidget(self.add_button)
 
-
     def onSelectFileClicked(self):
         filePath, _ = QFileDialog.getOpenFileName(self, 'Выберите файл', '', 'Текстовые файлы (*.txt);;Все файлы (*)')
         if filePath:
@@ -202,7 +196,6 @@ class App(QWidget):
                         QMessageBox.warning(self, 'Предупреждение', 'Файл пуст.')
             except Exception as e:
                 QMessageBox.critical(self, 'Ошибка', f'Ошибка чтения файла: {str(e)}')
-
 
     def addMeasurementsToLocalStorage(self):
         """Добавление измерений в базу данных."""
@@ -264,6 +257,128 @@ class App(QWidget):
             self.conn.close()  # Закрываем соединение, если оно открыто
         event.accept()
 
+    def connected_ui_downloading(self):
+        """Показывает UI после успешного подключения к базе данных для поиска и скачивания эксперимента."""
+        # Очистка текущего интерфейса
+        for i in reversed(range(self.layout.count())):
+            widget = self.layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+
+        # Виджеты для выбора параметров поиска
+        self.search_label = QLabel("Выберите параметры для поиска:")
+        self.layout.addWidget(self.search_label)
+
+        self.id_checkbox = QCheckBox("ID эксперимента")
+        self.layout.addWidget(self.id_checkbox)
+
+        self.description_checkbox = QCheckBox("Описание помещения")
+        self.layout.addWidget(self.description_checkbox)
+
+        self.address_checkbox = QCheckBox("Адрес")
+        self.layout.addWidget(self.address_checkbox)
+
+        # Поля для ввода значений
+        self.input_id = QLineEdit()
+        self.input_id.setPlaceholderText("Введите ID эксперимента")
+        self.layout.addWidget(self.input_id)
+
+        self.input_description = QLineEdit()
+        self.input_description.setPlaceholderText("Введите описание помещения")
+        self.layout.addWidget(self.input_description)
+
+        self.input_address = QLineEdit()
+        self.input_address.setPlaceholderText("Введите адрес")
+        self.layout.addWidget(self.input_address)
+
+        # Кнопка поиска
+        self.find_button = QPushButton("Найти эксперименты")
+        self.find_button.clicked.connect(self.find_experiments)
+        self.layout.addWidget(self.find_button)
+
+        # Таблица для отображения результатов поиска
+        self.results_table = QTableWidget()
+        self.results_table.setColumnCount(4)  # Колонки: ID, Описание, Адрес, Дата
+        self.results_table.setHorizontalHeaderLabels(["ID", "Описание", "Адрес", "Дата"])
+        self.layout.addWidget(self.results_table)
+
+        # Поле для ввода ID эксперимента
+        self.experiment_id_label = QLabel("Введите ID эксперимента:")
+        self.layout.addWidget(self.experiment_id_label)
+
+        self.experiment_id_input = QLineEdit()
+        self.layout.addWidget(self.experiment_id_input)
+
+        # Кнопка для получения результатов
+        self.get_results_button = QPushButton("Получить результаты эксперимента")
+        self.get_results_button.clicked.connect(self.download_experiment_results)
+        self.layout.addWidget(self.get_results_button)
+
+    def find_experiments(self):
+        """Ищет эксперименты по выбранным параметрам."""
+        query = "SELECT id, description, address, date FROM experiment WHERE 1=1"
+        params = []
+
+        if self.id_checkbox.isChecked() and self.input_id.text().strip():
+            query += " AND id = %s"
+            params.append(self.input_id.text().strip())
+
+        if self.description_checkbox.isChecked() and self.input_description.text().strip():
+            query += " AND description ILIKE %s"
+            params.append(f"%{self.input_description.text().strip()}%")
+
+        if self.address_checkbox.isChecked() and self.input_address.text().strip():
+            query += " AND address ILIKE %s"
+            params.append(f"%{self.input_address.text().strip()}%")
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            cursor.close()
+
+            self.results_table.setRowCount(len(results))
+            for row_idx, row_data in enumerate(results):
+                for col_idx, col_data in enumerate(row_data):
+                    self.results_table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось выполнить запрос: {str(e)}")
+
+    def download_experiment_results(self):
+        """Получает данные эксперимента и сохраняет их в файл."""
+        experiment_id = self.experiment_id_input.text().strip()
+
+        if not experiment_id:
+            QMessageBox.warning(self, "Ошибка", "Введите ID эксперимента!")
+            return
+
+        try:
+            query = """
+            SELECT fi, teta, r FROM measurements WHERE coordinate_id = %s
+            """
+            cursor = self.conn.cursor()
+            cursor.execute(query, (experiment_id,))
+            results = cursor.fetchall()
+            cursor.close()
+
+            if not results:
+                QMessageBox.warning(self, "Ошибка", "Результаты не найдены для указанного ID!")
+                return
+
+            # Создание txt файла
+            file_name = \
+            QFileDialog.getSaveFileName(self, "Сохранить файл", "experiment_results.txt", "Text Files (*.txt)")[0]
+            if file_name:
+                with open(file_name, "w") as file:
+                    file.write("Fi, Teta, R\n")
+                    for row in results:
+                        file.write(f"{row[0]}, {row[1]}, {row[2]}\n")
+
+                QMessageBox.information(self, "Успех", "Результаты успешно сохранены!")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось получить результаты: {str(e)}")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
