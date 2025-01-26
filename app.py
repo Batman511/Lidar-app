@@ -38,10 +38,9 @@ class App(QWidget):
         self.info_label_1.setAlignment(Qt.AlignmentFlag.AlignBottom)
         self.layout.addWidget(self.info_label_1)
 
-
         self.connect_button_local = QPushButton('Подключиться к локальной БД', self)
         self.connect_button_local.setFixedHeight(40)
-        self.connect_button_local.clicked.connect(self.connect_to_db)
+        self.connect_button_local.clicked.connect(lambda: self.connect_to_local_db('local'))
         self.layout.addWidget(self.connect_button_local)
 
         self.connect_button_global = QPushButton('Подключиться к серверной БД', self)
@@ -59,7 +58,7 @@ class App(QWidget):
 
         self.connect_button_download = QPushButton('Подключиться к серверной БД', self)
         self.connect_button_download.setFixedHeight(40)
-        # self.connect_button_download.clicked.connect(self.connect_to_db)
+        self.connect_button_download.clicked.connect(lambda: self.connect_to_local_db('server'))
         self.layout.addWidget(self.connect_button_download)
 
 
@@ -68,7 +67,7 @@ class App(QWidget):
 
 
         # Параметры БД
-        self.db_params = {
+        self.local_db_params = {
             'dbname': 'lidar',
             'user': 'postgres',
             'password': 'student',
@@ -85,9 +84,9 @@ class App(QWidget):
         self.layout.addWidget(self.info_label_2)
         self.layout.addWidget(self.connect_button_download)
 
-    def connect_to_db(self):
+    def connect_to_local_db(self, db_type):
         """Попытка подключения к базе данных."""
-        db_params = {
+        local_db_params = {
             'dbname': 'lidar',
             'user': 'postgres',
             'password': 'student',
@@ -96,21 +95,24 @@ class App(QWidget):
         }
 
         # Запускаем поток для проверки подключения
-        self.db_thread = DBConnectionThread(db_params)
-        self.db_thread.connection_status.connect(self.update_connection_status)
+        self.db_thread = DBConnectionThread(local_db_params)
+        self.db_thread.connection_status.connect(lambda msg: self.update_connection_status(msg, db_type))
         self.db_thread.start()
 
-    def update_connection_status(self, status_message):
+    def update_connection_status(self, status_message, db_type):
         """Обновляет статус подключения и UI в зависимости от результата."""
         if "успешно" in status_message:
             QMessageBox.information(self, 'Статус подключения', status_message)
-            self.conn = psycopg2.connect(**self.db_params)
-            self.connected_ui()  # Переход к основному окну приложения
+            self.conn = psycopg2.connect(**self.db_thread.db_params)
+            if db_type == 'local':
+                self.connected_ui_sending()  # Переход к окну приложения для загрузки
+            elif db_type == 'server':
+                self.connected_ui_downloading()  # Переход к окну приложения для скачивания
         else:
             QMessageBox.warning(self, 'Статус подключения', status_message)
 
 
-    def connected_ui(self):
+    def connected_ui_sending(self):
         """Показывает UI после успешного подключения к базе данных."""
         # Удаляем кнопки подключения
         self.layout.removeWidget(self.connect_button_local)
