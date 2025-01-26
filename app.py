@@ -1,7 +1,8 @@
 import sys
 import psycopg2
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, QFileDialog, QMessageBox, QTableWidgetItem
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal, Qt
+from psycopg2 import sql
 
 class DBConnectionThread(QThread):
     """Поток для проверки подключения к базе данных."""
@@ -29,8 +30,15 @@ class App(QWidget):
 
         self.layout = QVBoxLayout(self)
 
+        # Надпись перед кнопкой
+        self.info_label = QLabel('Если вы хотите загрузить результаты измерений, воспользуйтесь БД:', self)
+        self.info_label.setStyleSheet("font-size: 14px;")
+        self.info_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.layout.addWidget(self.info_label)
+
         # Кнопка для подключения
         self.connect_button = QPushButton('Подключиться к локальной БД', self)
+        self.connect_button.setFixedHeight(40)  # Увеличение высоты кнопки
         self.connect_button.clicked.connect(self.connect_to_db)
         self.layout.addWidget(self.connect_button)
 
@@ -40,8 +48,12 @@ class App(QWidget):
         # Изначально показываем только кнопку подключения
         self.connect_ui()
 
+        self.layout.setStretch(0, 0)  # Не растягиваем первый элемент (метка)
+        self.layout.setStretch(1, 0)  # Не растягиваем второй элемент (кнопка)
+
     def connect_ui(self):
         """Показывает UI для подключения к базе данных."""
+        self.layout.addWidget(self.info_label)
         self.layout.addWidget(self.connect_button)
 
     def connect_to_db(self):
@@ -79,6 +91,11 @@ class App(QWidget):
         # Удаляем кнопку подключения
         self.layout.removeWidget(self.connect_button)
         self.connect_button.deleteLater()
+        self.layout.removeWidget(self.info_label)
+        self.info_label.deleteLater()
+
+        # Добавляем для хранения координат из файла.
+        self.coordinates = []
 
         # Поля для ввода пользовательских данных
         self.ch_dt_label = QLabel('Дата и время (YYYY-MM-DD HH:MM:SS):')
@@ -126,8 +143,6 @@ class App(QWidget):
         self.layout.addWidget(self.add_button)
 
 
-
-
     def onSelectFileClicked(self):
         filePath, _ = QFileDialog.getOpenFileName(self, 'Выберите файл', '', 'Текстовые файлы (*.txt);;Все файлы (*)')
         if filePath:
@@ -152,12 +167,58 @@ class App(QWidget):
                 self.coordinates_table.setItem(row_idx, col_idx, QTableWidgetItem(val))
 
     def addMeasurementsToStorage(self):
-        """Добавление измерений в хранилище (например, в базу данных)."""
-        if self.conn:
-            # Здесь будет логика для добавления измерений в базу данных.
-            QMessageBox.information(self, 'Успех', 'Измерения успешно добавлены в хранилище.')
-        else:
+        """Добавление измерений в базу данных."""
+        if not self.conn:
             QMessageBox.warning(self, 'Ошибка', 'Не удалось подключиться к базе данных.')
+            return
+
+        try:
+            cursor = self.conn.cursor()
+
+            # Валидация пользовательских данных
+            ch_dt = self.ch_dt_edit.text().strip()
+            room_description = self.room_edit.text().strip()
+            address = self.address_edit.text().strip()
+            coordinates = self.coordinates_edit.text().strip()
+            object_description = self.object_edit.text().strip()
+
+            if not ch_dt or not self.coordinates:
+                QMessageBox.warning(self, 'Ошибка', 'Заполните все обязательные поля и загрузите файл.')
+                return
+
+            # Вставка данных в таблицу experiment
+            cursor.execute(
+                sql.SQL("""
+                        INSERT INTO experiment (ch_dt, room_description, address, coordinates, object_description)
+                        VALUES (%s, %s, %s, %s, %s)
+                        RETURNING id
+                    """),
+                (ch_dt, room_description, address, coordinates, object_description)
+            )
+            experiment_id = cursor.fetchone()[0]
+
+            # Вставка данных в таблицу measurements
+            for coord in self.coordinates:
+                if len(coord) != 3:
+                    QMessageBox.warning(self, 'Ошибка', 'Некорректный формат данных в файле.')
+                    return
+
+                fi, teta, r = map(float, coord)
+                cursor.execute(
+                    sql.SQL("""
+                            INSERT INTO measurements (id, fi, teta, R)
+                            VALUES (%s, %s, %s, %s)
+                        """),
+                    (experiment_id, fi, teta, r)
+                )
+
+            self.conn.commit()
+            QMessageBox.information(self, 'Успех', 'Данные успешно добавлены в базу данных.')
+        except Exception as e:
+            self.conn.rollback()
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка при добавлении данных: {str(e)}')
+        finally:
+            cursor.close()
 
     def closeEvent(self, event):
         """Закрытие приложения и проверка соединения с БД перед выходом."""
