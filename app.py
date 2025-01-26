@@ -63,11 +63,19 @@ class App(QWidget):
         self.layout.addWidget(self.connect_button_download)
 
 
-        # Изначально соединение None
-        self.conn = None
-
         # Изначально показываем только кнопки подключения
         self.connect_ui()
+
+
+        # Параметры БД
+        self.db_params = {
+            'dbname': 'lidar',
+            'user': 'postgres',
+            'password': 'student',
+            'host': 'localhost',
+            'port': '5432'
+        }
+        self.conn = None  # Изначально соединение
 
     def connect_ui(self):
         """Показывает UI для подключения к базе данных."""
@@ -96,15 +104,10 @@ class App(QWidget):
         """Обновляет статус подключения и UI в зависимости от результата."""
         if "успешно" in status_message:
             QMessageBox.information(self, 'Статус подключения', status_message)
-            self.conn = True  # Устанавливаем флаг успешного подключения
-            self.showMainWindow()  # Переходим к основному окну
+            self.conn = psycopg2.connect(**self.db_params)
+            self.connected_ui()  # Переход к основному окну приложения
         else:
             QMessageBox.warning(self, 'Статус подключения', status_message)
-
-    def showMainWindow(self):
-        """Переход к основному окну приложения."""
-        if self.conn:
-            self.connected_ui()  # Показываем UI после подключения
 
 
     def connected_ui(self):
@@ -126,12 +129,12 @@ class App(QWidget):
         self.coordinates = []
 
         # Поля для ввода пользовательских данных
-        self.ch_dt_label = QLabel('Дата и время (YYYY-MM-DD HH:MM:SS):')
+        self.ch_dt_label = QLabel('Дата и время (YYYY-MM-DD HH:MM:SS): *')
         self.ch_dt_edit = QLineEdit()
         self.layout.addWidget(self.ch_dt_label)
         self.layout.addWidget(self.ch_dt_edit)
 
-        self.room_label = QLabel('Описание помещения:')
+        self.room_label = QLabel('Описание помещения: *')
         self.room_edit = QLineEdit()
         self.layout.addWidget(self.room_label)
         self.layout.addWidget(self.room_edit)
@@ -146,13 +149,13 @@ class App(QWidget):
         self.layout.addWidget(self.coordinates_label)
         self.layout.addWidget(self.coordinates_edit)
 
-        self.coordinates_label = QLabel('Полярные координаты объекта из файла:')
+        self.coordinates_label = QLabel('Полярные координаты объекта из файла: *')
         self.layout.addWidget(self.coordinates_label)
 
         # Таблица для отображения координат
         self.coordinates_table = QTableWidget()
         self.coordinates_table.setColumnCount(3)
-        self.coordinates_table.setHorizontalHeaderLabels(["Fi", "Teta", "R"])
+        self.coordinates_table.setHorizontalHeaderLabels(["Fi", "R", "Teta"])
         self.layout.addWidget(self.coordinates_table)
 
         self.object_label = QLabel('Описание объекта:')
@@ -166,8 +169,8 @@ class App(QWidget):
         self.layout.addWidget(self.file_button)
 
         # Кнопка для добавления результатов измерений в сетевое хранилище
-        self.add_button = QPushButton('Добавить измерения в сетевое хранилище')
-        self.add_button.clicked.connect(self.addMeasurementsToStorage)
+        self.add_button = QPushButton('Добавить измерения в локальное хранилище')
+        self.add_button.clicked.connect(self.addMeasurementsToLocalStorage)
         self.layout.addWidget(self.add_button)
 
 
@@ -180,24 +183,23 @@ class App(QWidget):
                     if lines:
                         # Считываем все строки и сохраняем координаты
                         self.coordinates = [line.strip().split(';') for line in lines]
+
                         # Отображаем координаты в таблице
-                        self.displayCoordinates()
+                        self.coordinates_table.setRowCount(len(self.coordinates))
+                        for row_idx, coord in enumerate(self.coordinates):
+                            for col, value in enumerate(coord):
+                                item = QTableWidgetItem(value)
+                                self.coordinates_table.setItem(row_idx, col, item)
                     else:
                         QMessageBox.warning(self, 'Предупреждение', 'Файл пуст.')
             except Exception as e:
                 QMessageBox.critical(self, 'Ошибка', f'Ошибка чтения файла: {str(e)}')
 
-    def displayCoordinates(self):
-        """Отображаем координаты в таблице."""
-        self.coordinates_table.setRowCount(len(self.coordinates))
-        for row_idx, coord in enumerate(self.coordinates):
-            for col_idx, val in enumerate(coord):
-                self.coordinates_table.setItem(row_idx, col_idx, QTableWidgetItem(val))
 
-    def addMeasurementsToStorage(self):
+    def addMeasurementsToLocalStorage(self):
         """Добавление измерений в базу данных."""
         if not self.conn:
-            QMessageBox.warning(self, 'Ошибка', 'Не удалось подключиться к базе данных.')
+            QMessageBox.warning(self, 'Ошибка', 'Оборвалось подключение к базе данных.')
             return
 
         try:
@@ -210,37 +212,41 @@ class App(QWidget):
             coordinates = self.coordinates_edit.text().strip()
             object_description = self.object_edit.text().strip()
 
-            if not ch_dt or not self.coordinates:
+            if not ch_dt or not room_description or not self.coordinates_table.rowCount():
                 QMessageBox.warning(self, 'Ошибка', 'Заполните все обязательные поля и загрузите файл.')
                 return
 
             # Вставка данных в таблицу experiment
-            cursor.execute(
-                sql.SQL("""
-                        INSERT INTO experiment (ch_dt, room_description, address, coordinates, object_description)
+            cursor.execute("""
+                        INSERT INTO experiment 
+                        (ch_dt, room_description, address, coordinates, object_description) 
                         VALUES (%s, %s, %s, %s, %s)
                         RETURNING id
-                    """),
-                (ch_dt, room_description, address, coordinates, object_description)
-            )
+                        """,
+                (ch_dt, room_description, address, coordinates, object_description))
             experiment_id = cursor.fetchone()[0]
+            self.conn.commit()
 
-            # Вставка данных в таблицу measurements
-            for coord in self.coordinates:
-                if len(coord) != 3:
-                    QMessageBox.warning(self, 'Ошибка', 'Некорректный формат данных в файле.')
+
+            # Вставка данных из таблицы координат в таблицу measurement с experiment_id
+            for row in range(self.coordinates_table.rowCount()):
+                fi = self.coordinates_table.item(row, 0).text()
+                teta = self.coordinates_table.item(row, 2).text()
+                R = self.coordinates_table.item(row, 1).text()
+                try:
+                    cursor.execute("""
+                                INSERT INTO measurements 
+                                (id, fi, teta, R) 
+                                VALUES (%s, %s, %s, %s)
+                                """,
+                           (experiment_id, fi, teta, R))
+                    self.conn.commit()
+                except Exception as e:
+                    self.conn.rollback()
+                    QMessageBox.critical(self, 'Ошибка', f'Ошибка при добавлении данных: {str(e)}')
+                    cursor.close()
                     return
 
-                fi, teta, r = map(float, coord)
-                cursor.execute(
-                    sql.SQL("""
-                            INSERT INTO measurements (id, fi, teta, R)
-                            VALUES (%s, %s, %s, %s)
-                        """),
-                    (experiment_id, fi, teta, r)
-                )
-
-            self.conn.commit()
             QMessageBox.information(self, 'Успех', 'Данные успешно добавлены в базу данных.')
         except Exception as e:
             self.conn.rollback()
