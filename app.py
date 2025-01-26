@@ -18,7 +18,7 @@ class DBConnectionThread(QThread):
             self.connection_status.emit("Подключение к базе данных успешно выполнено.")
             conn.close()
         except Exception as e:
-            error_message = f"Ошибка подключения: {str(e)}"
+            error_message = f"Подключение произошло с ошибкой: {str(e)}\n\nПроверьте наличие БД в Вашей системе!\nПроверьте параметры входа в коде программы!"
             self.connection_status.emit(error_message)
 
 class App(QWidget):
@@ -49,7 +49,7 @@ class App(QWidget):
         db_params = {
             'dbname': 'lidar',
             'user': 'postgres',
-            'password': 'student 11',
+            'password': 'student',
             'host': 'localhost',
             'port': '5432'
         }
