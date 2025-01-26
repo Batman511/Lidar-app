@@ -29,32 +29,53 @@ class App(QWidget):
         self.setGeometry(100, 100, 800, 600)
 
         self.layout = QVBoxLayout(self)
+        self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Надпись перед кнопкой
-        self.info_label = QLabel('Если вы хотите загрузить результаты измерений, воспользуйтесь БД:', self)
-        self.info_label.setStyleSheet("font-size: 14px;")
-        self.info_label.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.layout.addWidget(self.info_label)
+        # Первый набор кнопок
+        self.info_label_1 = QLabel('Если Вы хотите загрузить результаты измерений, воспользуйтесь соответствующей БД:', self)
+        self.info_label_1.setFixedHeight(40)
+        self.info_label_1.setStyleSheet("font-size: 14px;")
+        self.info_label_1.setAlignment(Qt.AlignmentFlag.AlignBottom)
+        self.layout.addWidget(self.info_label_1)
 
-        # Кнопка для подключения
-        self.connect_button = QPushButton('Подключиться к локальной БД', self)
-        self.connect_button.setFixedHeight(40)  # Увеличение высоты кнопки
-        self.connect_button.clicked.connect(self.connect_to_db)
-        self.layout.addWidget(self.connect_button)
+
+        self.connect_button_local = QPushButton('Подключиться к локальной БД', self)
+        self.connect_button_local.setFixedHeight(40)
+        self.connect_button_local.clicked.connect(self.connect_to_db)
+        self.layout.addWidget(self.connect_button_local)
+
+        self.connect_button_global = QPushButton('Подключиться к серверной БД', self)
+        self.connect_button_global.setFixedHeight(40)
+        # self.connect_button_global.clicked.connect(self.connect_to_db)
+        self.layout.addWidget(self.connect_button_global)
+
+
+        # Второй набор кнопок
+        self.info_label_2 = QLabel('Если Вы хотите скачать результаты измерений, воспользуйтесь кнопкой:', self)
+        self.info_label_2.setFixedHeight(60)
+        self.info_label_2.setStyleSheet("font-size: 14px;")
+        self.info_label_2.setAlignment(Qt.AlignmentFlag.AlignBottom)
+        self.layout.addWidget(self.info_label_2)
+
+        self.connect_button_download = QPushButton('Подключиться к серверной БД', self)
+        self.connect_button_download.setFixedHeight(40)
+        # self.connect_button_download.clicked.connect(self.connect_to_db)
+        self.layout.addWidget(self.connect_button_download)
+
 
         # Изначально соединение None
         self.conn = None
 
-        # Изначально показываем только кнопку подключения
+        # Изначально показываем только кнопки подключения
         self.connect_ui()
-
-        self.layout.setStretch(0, 0)  # Не растягиваем первый элемент (метка)
-        self.layout.setStretch(1, 0)  # Не растягиваем второй элемент (кнопка)
 
     def connect_ui(self):
         """Показывает UI для подключения к базе данных."""
-        self.layout.addWidget(self.info_label)
-        self.layout.addWidget(self.connect_button)
+        self.layout.addWidget(self.info_label_1)
+        self.layout.addWidget(self.connect_button_local)
+        self.layout.addWidget(self.connect_button_global)
+        self.layout.addWidget(self.info_label_2)
+        self.layout.addWidget(self.connect_button_download)
 
     def connect_to_db(self):
         """Попытка подключения к базе данных."""
@@ -88,11 +109,18 @@ class App(QWidget):
 
     def connected_ui(self):
         """Показывает UI после успешного подключения к базе данных."""
-        # Удаляем кнопку подключения
-        self.layout.removeWidget(self.connect_button)
-        self.connect_button.deleteLater()
-        self.layout.removeWidget(self.info_label)
-        self.info_label.deleteLater()
+        # Удаляем кнопки подключения
+        self.layout.removeWidget(self.connect_button_local)
+        self.connect_button_local.deleteLater()
+        self.layout.removeWidget(self.connect_button_global)
+        self.connect_button_global.deleteLater()
+        self.layout.removeWidget(self.connect_button_download)
+        self.connect_button_download.deleteLater()
+        self.layout.removeWidget(self.info_label_1)
+        self.info_label_1.deleteLater()
+        self.layout.removeWidget(self.info_label_2)
+        self.info_label_2.deleteLater()
+
 
         # Добавляем для хранения координат из файла.
         self.coordinates = []
