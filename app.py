@@ -362,7 +362,7 @@ class App(QWidget):
 
         try:
             query = """
-            SELECT fi, teta, r FROM measurements WHERE coordinate_id = %s
+            SELECT fi, teta, R FROM measurements WHERE id = %s
             """
             cursor = self.conn.cursor()
             cursor.execute(query, (experiment_id,))
@@ -370,17 +370,15 @@ class App(QWidget):
             cursor.close()
 
             if not results:
-                QMessageBox.warning(self, "Ошибка", "Результаты не найдены для указанного ID!")
+                QMessageBox.warning(self, "Ошибка", "Не найдено результатов для данного ID.")
                 return
 
             # Создание txt файла
-            file_name = \
-            QFileDialog.getSaveFileName(self, "Сохранить файл", "experiment_results.txt", "Text Files (*.txt)")[0]
+            file_name = QFileDialog.getSaveFileName(self, "Сохранить файл", f"experiment_results_{experiment_id}.txt", "Text Files (*.txt)")[0]
             if file_name:
                 with open(file_name, "w") as file:
-                    file.write("Fi, Teta, R\n")
                     for row in results:
-                        file.write(f"{row[0]}, {row[1]}, {row[2]}\n")
+                        file.write(f"{row[0]:.4f};{row[1]:.4f};{row[2]:.4f}\n")
 
                 QMessageBox.information(self, "Успех", "Результаты успешно сохранены!")
 
