@@ -33,7 +33,7 @@ class App(QWidget):
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Первый набор кнопок
-        self.info_label_1 = QLabel('Если Вы хотите загрузить результаты измерений, воспользуйтесь соответствующей БД:', self)
+        self.info_label_1 = QLabel('Если Вы хотите ЗАГРУЗИТЬ результаты измерений, воспользуйтесь соответствующей БД:', self)
         self.info_label_1.setFixedHeight(40)
         self.info_label_1.setStyleSheet("font-size: 14px;")
         self.info_label_1.setAlignment(Qt.AlignmentFlag.AlignBottom)
@@ -51,7 +51,7 @@ class App(QWidget):
 
 
         # Второй набор кнопок
-        self.info_label_2 = QLabel('Если Вы хотите скачать результаты измерений, воспользуйтесь кнопкой:', self)
+        self.info_label_2 = QLabel('Если Вы хотите СКАЧАТЬ результаты измерений, воспользуйтесь кнопкой:', self)
         self.info_label_2.setFixedHeight(60)
         self.info_label_2.setStyleSheet("font-size: 14px;")
         self.info_label_2.setAlignment(Qt.AlignmentFlag.AlignBottom)
@@ -75,6 +75,13 @@ class App(QWidget):
             'host': 'localhost',
             'port': '5432'
         }
+        self.global_db_params = {
+            'dbname': 'lidar',
+            'user': 'postgres',
+            'password': 'student',
+            'host': 'localhost',
+            'port': '5432'
+        }
         self.conn = None  # Изначально соединение
 
     def connect_ui(self):
@@ -86,17 +93,9 @@ class App(QWidget):
         self.layout.addWidget(self.connect_button_download)
 
     def connect_to_local_db(self, db_type):
-        """Попытка подключения к базе данных."""
-        local_db_params = {
-            'dbname': 'lidar',
-            'user': 'postgres',
-            'password': 'student',
-            'host': 'localhost',
-            'port': '5432'
-        }
-
+        """Попытка подключения к локальной базе данных."""
         # Запускаем поток для проверки подключения
-        self.db_thread = DBConnectionThread(local_db_params)
+        self.db_thread = DBConnectionThread(self.local_db_params)
         self.db_thread.connection_status.connect(lambda msg: self.update_connection_status(msg, db_type))
         self.db_thread.start()
 
