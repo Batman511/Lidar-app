@@ -46,7 +46,7 @@ class App(QWidget):
 
         self.connect_button_global = QPushButton('Подключиться к серверной БД', self)
         self.connect_button_global.setFixedHeight(40)
-        # self.connect_button_global.clicked.connect(self.connect_to_db)
+        self.connect_button_global.clicked.connect(lambda: self.connect_to_global_db('global_server_sending'))
         self.layout.addWidget(self.connect_button_global)
 
 
@@ -59,7 +59,7 @@ class App(QWidget):
 
         self.connect_button_download = QPushButton('Подключиться к серверной БД', self)
         self.connect_button_download.setFixedHeight(40)
-        self.connect_button_download.clicked.connect(lambda: self.connect_to_local_db('server'))
+        self.connect_button_download.clicked.connect(lambda: self.connect_to_global_db('global_server_downloading')) # self.connect_to_local_db('server')
         self.layout.addWidget(self.connect_button_download)
 
 
@@ -76,11 +76,11 @@ class App(QWidget):
             'port': '5432'
         }
         self.global_db_params = {
-            'dbname': 'lidar',
-            'user': 'postgres',
-            'password': 'student',
-            'host': 'localhost',
-            'port': '5432'
+            'dbname': 'b7bbewg4oo8jhldjipxs',
+            'user': 'uwividlpg4bmnvhxdp80',
+            'password': 'rXQN3esV8Acpa6Sx8t5xlHFiNDLS8d',
+            'host': 'b7bbewg4oo8jhldjipxs-postgresql.services.clever-cloud.com',
+            'port': '50013'
         }
         self.conn = None  # Изначально соединение
 
@@ -99,15 +99,29 @@ class App(QWidget):
         self.db_thread.connection_status.connect(lambda msg: self.update_connection_status(msg, db_type))
         self.db_thread.start()
 
+    def connect_to_global_db(self, db_type):
+        """Попытка подключения к глобальной базе данных."""
+        # Запускаем поток для проверки подключения
+        self.db_thread = DBConnectionThread(self.global_db_params)
+        self.db_thread.connection_status.connect(lambda msg: self.update_connection_status(msg, db_type))
+        self.db_thread.start()
+
     def update_connection_status(self, status_message, db_type):
         """Обновляет статус подключения и UI в зависимости от результата."""
         if "успешно" in status_message:
             QMessageBox.information(self, 'Статус подключения', status_message)
-            self.conn = psycopg2.connect(**self.db_thread.db_params)
             if db_type == 'local':
+                self.conn = psycopg2.connect(**self.local_db_params)
                 self.connected_ui_sending()  # Переход к окну приложения для загрузки
             elif db_type == 'server':
+                self.conn = psycopg2.connect(**self.local_db_params)
                 self.connected_ui_downloading()  # Переход к окну приложения для скачивания
+            elif db_type == 'global_server_sending':
+                self.conn = psycopg2.connect(**self.global_db_params)
+                self.connected_ui_sending()  # Переход к окну приложения для загрузки из глобальной версии
+            elif db_type == 'global_server_downloading':
+                self.conn = psycopg2.connect(**self.global_db_params)
+                self.connected_ui_downloading()  # Переход к окну приложения для скачивания из глобальной версии
         else:
             QMessageBox.warning(self, 'Статус подключения', status_message)
 
